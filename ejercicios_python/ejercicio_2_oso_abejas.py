@@ -28,9 +28,9 @@ simulacion_activa = True
 # - Un cerrojo (Lock) o semáforo binario para exclusión mutua en el tarro.
 # - Un semáforo para despertar al oso cuando el tarro esté lleno.
 # - Un semáforo para que las abejas esperen si el tarro está lleno o el oso está comiendo.
-# mutex = threading.Lock()
-# sem_oso = threading.Semaphore(0)
-# sem_tarro_disponible = threading.Semaphore(1)
+mutex = threading.Lock()
+sem_oso = threading.Semaphore(0)
+sem_tarro_disponible = threading.Semaphore(1)
 
 def abeja(id_abeja):
     global tarro_miel, simulacion_activa
@@ -39,10 +39,24 @@ def abeja(id_abeja):
         
         # TODO: Sincronizar el acceso al tarro de miel:
         # 1. Esperar a que el tarro esté disponible.
+        sem_tarro_disponible.acquire()
         # 2. Entrar en exclusión mutua con el tarro.
+        if not simulacion_activa:
+            sem_tarro_disponible.release()
+            break
+
         # 3. Depositar una porción de miel (tarro_miel += 1).
+        with mutex:
+            tarro_miel += 1
+            lleno = (tarro_miel == M)
+
         # 4. Si tarro_miel == M, avisar/despertar al oso dormido.
         # 5. Si no está lleno, permitir que otras abejas sigan produciendo.
+
+        if lleno:
+            sem_oso.release()
+        else:
+            sem_tarro_disponible.release()
         pass
 
 def oso(max_tarros=2):
@@ -52,8 +66,12 @@ def oso(max_tarros=2):
         # =====================================================================
         # TODO PARA EL ESTUDIANTE:
         # 1. Esperar pasivamente (bloqueado) hasta que una abeja señale que el tarro está lleno:
-        #    sem_oso.acquire()
-        # 2. Comerse toda la miel (tarro_miel = 0).
+        sem_oso.acquire()
+        # 2. Comerse toda la miel 
+        with mutex:
+            tarro_miel = 0
+        tarros_comidos += 1
+        sem_tarro_disponible.release()
         # 3. Incrementar tarros_comidos += 1.
         # 4. Avisar a las abejas que el tarro está vacío y disponible (sem_tarro_disponible.release()).
         # =====================================================================
